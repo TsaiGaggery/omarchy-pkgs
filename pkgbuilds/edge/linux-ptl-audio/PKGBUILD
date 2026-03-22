@@ -3,8 +3,8 @@
 
 pkgbase=linux-ptl-audio
 pkgver=6.19.9.arch1
-pkgrel=1
-pkgdesc='Linux with Panther Lake SDCA audio backports'
+pkgrel=2
+pkgdesc='Linux with Panther Lake SDCA audio + IPU7 PSYS camera support'
 url='https://github.com/archlinux/linux'
 arch=(
   x86_64
@@ -42,6 +42,8 @@ source=(
   0013-ASoC-SDCA-Add-regmap-defaults-for-specification-defi.patch
   0014-ASoC-SDCA-Limit-values-user-can-write-to-Selected-Mo.patch
   0017-ASoC-SDCA-Fix-NULL-pointer-dereference-in-sdca_jack_.patch
+  0018-staging-ipu7-port-PSYS-from-ipu7-drivers.patch
+  ipu7-psys.h
 )
 source_x86_64=(config.x86_64)
 validpgpkeys=(
@@ -54,7 +56,7 @@ b2sums=('6be41037c5b18e9a8d1c58fdd613e37bb5c841b7f43baf95516f3dda461adc6eb20da03
         'edc6d11f32f16a53e520b53b52be690d192c0a64153419cbba65e4a2c0f426ce76ab2c10dbddd7f82f2c407c071039b05018796cf2b8ba501d46e3a259146ced'
         'SKIP'
         'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
-        'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 b2sums_x86_64=('cab93bd983d92e2fc6047bfaa3fc3b52fbd23272aef4aaa10500ac0ac26847c1bbdfdb13a6f64ad7689166109b99a078580bf43a02aaf9f2be0ae8885a87ffc8')
 
 # https://www.kernel.org/pub/linux/kernel/v6.x/sha256sums.asc
@@ -63,7 +65,7 @@ sha256sums=('c16068a3af12e3943dee3b1eef57ca70229c069128bfa1184fb3f48b219d55bf'
             'dacb94dc3be57fc442995a3d3d1519775d3f6877a4e2fec437223d95e318f04b'
             'SKIP'
             'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
-            'SKIP' 'SKIP' 'SKIP' 'SKIP')
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 export KBUILD_BUILD_HOST=archlinux
 export KBUILD_BUILD_USER=$pkgbase
@@ -85,6 +87,16 @@ prepare() {
     echo "Applying patch $src..."
     patch -Np1 < "../$src"
   done
+
+  echo "Installing IPU7 PSYS UAPI header..."
+  install -Dm644 ../ipu7-psys.h include/uapi/linux/ipu7-psys.h
+
+  echo "Fixing PSYS debugfs references for staging struct..."
+  local PSYS_FILE="drivers/staging/media/ipu7/psys/ipu-psys.c"
+  if [ -f "$PSYS_FILE" ] && grep -q 'isp->ipu7_dir' "$PSYS_FILE"; then
+    sed -i 's/psys->adev->isp->ipu7_dir/NULL/' "$PSYS_FILE"
+    sed -i 's/if (isp->ipu7_dir)/if (psys->debugfsdir)/' "$PSYS_FILE"
+  fi
 
   echo "Setting config..."
   cp ../config.$CARCH .config
